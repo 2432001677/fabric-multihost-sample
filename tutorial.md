@@ -130,19 +130,18 @@ peer lifecycle chaincode install basic.tar.gz
 docker exec -it cli bash
 peer lifecycle chaincode package basic.tar.gz --path ./chaincode/go/abstore --lang golang --label basic
 peer lifecycle chaincode install basic.tar.gz
-```
 
-### 批准链码
-
-```zsh
 # 拿到Package ID
 peer lifecycle chaincode queryinstalled
 
 # 输出
 Installed chaincodes on peer:
 Package ID: basic:6f292c790b756d2cb8a35de6c421187b533b9917d56458189e12e09fe34984cd, Label: basic
+```
 
+### 批准链码
 
+```zsh
 # 192.9.200.172
 docker exec -it cli bash
 # 查看链码批准情况
@@ -194,5 +193,39 @@ peer chaincode query -C mychannel -n basic -c '{"Args":["query","a"]}'
 
 # 输出
 100
+
+# 尝试交易
+peer chaincode invoke -o orderer.example.com:7050 --tls true --cafile $ORDERER_CA -C mychannel -n basic --peerAddresses peer0.org1.example.com:7051 --tlsRootCertFiles /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt --peerAddresses peer0.org2.example.com:7051 --tlsRootCertFiles /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt -c '{"Args":["Invoke","a","b","10"]}'
+
+# 输出
+2022-06-17 02:07:42.079 UTC 0003 INFO [chaincodeCmd] chaincodeInvokeOrQuery -> Chaincode invoke successful. result: status:200
+```
+
+---
+
+## 后续升级链码  
+
+```zsh
+# 192.9.200.172
+docker exec -it cli bash
+peer lifecycle chaincode package basic2.tar.gz --path ./chaincode/go/abstore --lang golang --label basic
+peer lifecycle chaincode install basic2.tar.gz
+
+# 192.9.200.232
+docker exec -it cli bash
+peer lifecycle chaincode package basic2.tar.gz --path ./chaincode/go/abstore --lang golang --label basic
+peer lifecycle chaincode install basic2.tar.gz
+
+# 拿到新的Package ID
+peer lifecycle chaincode queryinstalled
+
+# sequence加一, 版本号更新到2.0
+peer lifecycle chaincode approveformyorg --tls true --cafile $ORDERER_CA --channelID mychannel -n basic -v 2.0 --init-required --package-id <新的Package ID> --sequence 2 --waitForEvent
+
+peer lifecycle chaincode commit -o orderer.example.com:7050 --tls true --cafile $ORDERER_CA -C mychannel -n basic -v 2.0 --sequence 2 --init-required --peerAddresses peer0.org1.example.com:7051 --tlsRootCertFiles /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt --peerAddresses peer0.org2.example.com:7051 --tlsRootCertFiles /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt
+
+#查询当前链码定义已同意的组织
+peer lifecycle chaincode checkcommitreadiness --channelID mychannel --name mycc --version 2.0 --sequence 2 --output json
+
 ```
 
