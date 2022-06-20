@@ -9,7 +9,7 @@
 | peer0.org1.example.com | fabric-peer    | 192.9.200.172 |
 | peer0.org2.example.com | fabric-peer    | 192.9.200.230 |
 
-
+>  需要在hosts里添加以上域名和ip
 
 ## orderer  
 
@@ -67,12 +67,14 @@
 ### 管理者创建证书  
 
 ```zsh
-
-
 ./bin/cryptogen generate --config=./crypto-config.yaml
 mkdir channel-artifacts
 ./bin/configtxgen -profile TwoOrgsOrdererGenesis -outputBlock ./channel-artifacts/genesis.block -channelID system
 ./bin/configtxgen -profile TwoOrgsChannel -outputCreateChannelTx ./channel-artifacts/mychannel.tx -channelID mychannel
+
+# 创建锚节点
+./bin/configtxgen -profile TwoOrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/org1.tx -channelID mychannel -asOrg Org1MSP
+./bin/configtxgen -profile TwoOrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/org2.tx -channelID mychannel -asOrg Org2MSP
 
 # 复制到192.9.200.172
 scp -r raft/resource/channel-artifacts bruce@192.9.200.172:/home/bruce/raft/resource/
@@ -104,8 +106,12 @@ peer channel create -o orderer.example.com:7050 -c mychannel -f ./channel-artifa
 # peer 加入channel
 peer channel join -b ./channel-artifacts/mychannel.block
 
+# 添加锚节点
+peer channel update -o orderer.example.com:7050 -c mychannel -f ./channel-artifacts/org1.tx --tls --cafile $ORDERER_CA
+
 #成功后复制文件
 scp -r ./channel-artifacts bruce@192.9.200.232:/home/bruce/raft/resource
+
 
 # 192.9.200.232
 # 下载链码依赖
@@ -116,6 +122,9 @@ cd ../../..
 docker exec -it cli bash
 # peer 加入channel
 peer channel join -b ./channel-artifacts/mychannel.block
+
+# 添加锚节点
+peer channel update -o orderer.example.com:7050 -c mychannel -f ./channel-artifacts/org2.tx --tls --cafile $ORDERER_CA
 ```
 
 ### 部署链码

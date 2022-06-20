@@ -1,0 +1,119 @@
+version: 1.0.0
+
+# GO SDK 客户端配置
+client:
+  # 客户端所属的组织，必须是organizations定义的组织
+  organization: Org1
+  # 日志级别
+  logging:
+    level: info
+  # MSP证书的根路径
+  cryptoconfig:
+    path: ./crypto-config
+  BCCSP:
+    security:
+      enabled: true
+      default:
+        provider: "SW"
+      hashAlgorithm: "SHA2"
+      softVerify: true
+      level: 256
+
+# 通道定义
+channels:
+  mychannel:
+    orderers:
+      - orderer.example.com
+    peers:
+      peer0.org1.example.com:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+      peer1.org2.example.com:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+
+# 组织配置
+organizations:
+  Org1:
+    mspid: "Org1MSP"
+    cryptoPath: crypto-config/peerOrganizations/org1.example.com/users/{username}@org1.example.com/msp
+    peers:
+      - peer0.org1.example.com
+    users:
+      Admin:
+        cert:
+          path: crypto-config/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/signcerts/Admin@org1.example.com-cert.pem
+        key:
+          path: crypto-config/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/keystore/priv_sk
+      User1:
+        cert:
+          path: crypto-config/peerOrganizations/org1.example.com/users/User1@org1.example.com/msp/signcerts/User1@org1.example.com-cert.pem
+        key:
+          path: crypto-config/peerOrganizations/org1.example.com/users/User1@org1.example.com/msp/keystore/priv_sk
+
+#orderer节点列表
+orderers:
+  orderer.example.com:
+    url: grpcs://orderer.example.com:7050
+    # 传递给gRPC客户端构造函数
+    grpcOptions:
+      ssl-target-name-override: orderer.example.com
+      keep-alive-time: 0s
+      keep-alive-timeout: 20s
+      keep-alive-permit: false
+      fail-fast: false
+      allow-insecure: true
+    tlsCACerts:
+      path: crypto-config/ordererOrganizations/example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+
+# peers节点列表
+peers:
+  # peer节点定义，可以定义多个
+  peer0.org1.example.com:
+    # URL用于发送背书和查询请求
+    url: peer0.org1.example.com:7051
+    # eventUrl: peer0.org1.example.com:7053
+    # 传递给gRPC客户端构造函数
+    # grpcOptions:
+    #   ssl-target-name-override: peer0.org1.example.com
+    #   keep-alive-time: 0s
+    #   keep-alive-timeout: 20s
+    #   keep-alive-permit: false
+    #   fail-fast: false
+    #   allow-insecure: true
+    tlsCACerts:
+      path: crypto-config/peerOrganizations/org1.example.com/tlsca/tlsca.org1.example.com-cert.pem
+  peer0.org2.example.com:
+    url: peer0.org2.example.com:7051
+    # eventUrl: peer0.org2.example.com
+    # grpcOptions:
+    #   ssl-target-name-override: peer0.org2.example.com
+    #   keep-alive-time: 0s
+    #   keep-alive-timeout: 20s
+    #   keep-alive-permit: false
+    #   fail-fast: false
+    #   allow-insecure: true
+    tlsCACerts:
+      path: crypto-config/peerOrganizations/org2.example.com/tlsca/tlsca.org2.example.com-cert.pem
+
+entityMatchers:
+  peer:
+    - pattern: peer0.org1.example.com
+      urlSubstitutionExp: peer0.org1.example.com:7051
+      sslTargetOverrideUrlSubstitutionExp: peer0.org1.example.com
+      mappedHost: peer0.org1.example.com
+
+    - pattern: peer0.org2.example.com
+      urlSubstitutionExp: peer0.org2.example.com:7051
+      sslTargetOverrideUrlSubstitutionExp: peer0.org2.example.com
+      mappedHost: peer0.org2.example.com
+
+  orderer:
+    - pattern: (\w+).example.(\w+)
+      urlSubstitutionExp: grpcs://orderer.example.com:7050
+      sslTargetOverrideUrlSubstitutionExp: orderer.example.com
+      mappedHost: orderer.example.com
