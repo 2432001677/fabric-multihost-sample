@@ -72,13 +72,10 @@ mkdir channel-artifacts
 ./bin/configtxgen -profile TwoOrgsOrdererGenesis -outputBlock ./channel-artifacts/genesis.block -channelID system
 ./bin/configtxgen -profile TwoOrgsChannel -outputCreateChannelTx ./channel-artifacts/mychannel.tx -channelID mychannel
 
-# 创建锚节点
-./bin/configtxgen -profile TwoOrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/org1.tx -channelID mychannel -asOrg Org1MSP
-./bin/configtxgen -profile TwoOrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/org2.tx -channelID mychannel -asOrg Org2MSP
 
 # 复制到192.9.200.172
-scp -r raft/resource/channel-artifacts bruce@192.9.200.172:/home/bruce/raft/resource/
-scp -r raft/resource/channel-artifacts bruce@192.9.200.232:/home/bruce/raft/resource/
+scp -r raft bruce@192.9.200.172:/home/bruce
+scp -r raft bruce@192.9.200.232:/home/bruce
 ```
 
 ### 启动所有服务
@@ -86,8 +83,14 @@ scp -r raft/resource/channel-artifacts bruce@192.9.200.232:/home/bruce/raft/reso
 # 192.9.200.125
 docker-compose -f docker-compose-orderer.yaml up -d
 # 192.9.200.172
+# 创建锚节点
+./bin/configtxgen -profile TwoOrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/org1.tx -channelID mychannel -asOrg Org1MSP
+
 docker-compose -f docker-compose-peer0-org1.yaml up -d
 # 192.9.200.232
+# 创建锚节点
+./bin/configtxgen -profile TwoOrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/org2.tx -channelID mychannel -asOrg Org2MSP
+
 docker-compose -f docker-compose-peer0-org2.yaml up -d
 ```
 
@@ -120,6 +123,7 @@ go mod vendor
 cd ../../..
 
 docker exec -it cli bash
+ORDERER_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
 # peer 加入channel
 peer channel join -b ./channel-artifacts/mychannel.block
 
@@ -156,19 +160,16 @@ docker exec -it cli bash
 # 查看链码批准情况
 peer lifecycle chaincode checkcommitreadiness --channelID mychannel --name basic -v 1 --sequence 1 --output json --init-required
 
-
 ORDERER_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
 
 peer lifecycle chaincode approveformyorg --tls true --cafile $ORDERER_CA --channelID mychannel -n basic -v 1 --init-required --package-id basic:6f292c790b756d2cb8a35de6c421187b533b9917d56458189e12e09fe34984cd --sequence 1 --waitForEvent
 
-
 # 查看链码批准情况
 peer lifecycle chaincode checkcommitreadiness --channelID mychannel --name basic -v 1 --sequence 1 --output json --init-required
+
 
 # 192.9.200.232
-# 查看链码批准情况
-peer lifecycle chaincode checkcommitreadiness --channelID mychannel --name basic -v 1 --sequence 1 --output json --init-required
-
+docker exec -it cli bash
 ORDERER_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
 
 peer lifecycle chaincode approveformyorg --tls true --cafile $ORDERER_CA --channelID mychannel -n basic -v 1 --init-required --package-id basic:6f292c790b756d2cb8a35de6c421187b533b9917d56458189e12e09fe34984cd --sequence 1 --waitForEvent
@@ -217,11 +218,13 @@ peer chaincode invoke -o orderer.example.com:7050 --tls true --cafile $ORDERER_C
 ```zsh
 # 192.9.200.172
 docker exec -it cli bash
+ORDERER_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
 peer lifecycle chaincode package basic2.tar.gz --path ./chaincode/go/abstore --lang golang --label basic
 peer lifecycle chaincode install basic2.tar.gz
 
 # 192.9.200.232
 docker exec -it cli bash
+ORDERER_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
 peer lifecycle chaincode package basic2.tar.gz --path ./chaincode/go/abstore --lang golang --label basic
 peer lifecycle chaincode install basic2.tar.gz
 
@@ -233,8 +236,13 @@ peer lifecycle chaincode approveformyorg --tls true --cafile $ORDERER_CA --chann
 
 peer lifecycle chaincode commit -o orderer.example.com:7050 --tls true --cafile $ORDERER_CA -C mychannel -n basic -v 2.0 --sequence 2 --init-required --peerAddresses peer0.org1.example.com:7051 --tlsRootCertFiles /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt --peerAddresses peer0.org2.example.com:7051 --tlsRootCertFiles /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt
 
-#查询当前链码定义已同意的组织
-peer lifecycle chaincode checkcommitreadiness --channelID mychannel --name mycc --version 2.0 --sequence 2 --output json
+# 查看提交情况
+peer lifecycle chaincode querycommitted -C mychannel -n basic
+
+Committed chaincode definition for chaincode 'basic' on channel 'mychannel':
+Version: 2.0, Sequence: 2, Endorsement Plugin: escc, Validation Plugin: vscc, Approvals: [Org1MSP: true, Org2MSP: true]
+
+peer chaincode invoke -o orderer.example.com:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile $ORDERER_CA -C mychannel -n basic --peerAddresses peer0.org1.example.com:7051 --tlsRootCertFiles /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt --peerAddresses peer0.org2.example.com:7051 --tlsRootCertFiles /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt --isInit -c '{"function":"InitLedger","Args":[]}'
 
 ```
 
