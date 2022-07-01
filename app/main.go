@@ -36,6 +36,9 @@ func main() {
 	fmt.Println(result.ChaincodeStatus)
 	fmt.Println(string(result.Payload))
 
+	result, _= client.Query(channel.Request{ChaincodeID: chainCodeName, Fcn: "query", Args: [][]byte{[]byte("b")}})
+	fmt.Println(string(result.Payload))
+
 	result, err = client.Execute(channel.Request{ChaincodeID: chainCodeName, Fcn: "invoke", Args: [][]byte{[]byte("a"), []byte("b"), []byte("10")}})
 	if err != nil {
 		log.Fatal(err)
